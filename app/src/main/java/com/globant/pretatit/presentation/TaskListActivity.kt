@@ -24,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.colorResource
@@ -32,24 +33,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.globant.pretatit.R
 import com.globant.pretatit.presentation.theme.PretatitTheme
+import kotlinx.coroutines.flow.MutableStateFlow
 import timber.log.Timber
-import kotlin.collections.mutableListOf
 
 const val CREATE_TASK_RESULT = "create.task.result"
 
+private val INITIAL_TASK_LIST = mutableListOf<Task>(
+    Task("Feed the cat", "It likes to eat mice!", TaskPriority.HIGH),
+    Task("Feed the dog", "It likes to eat mice!", TaskPriority.HIGH),
+    Task("Feed the hamster", "It likes to eat mice!", TaskPriority.HIGH),
+)
+
 class TaskListActivity : ComponentActivity() {
 
-    private val taskList = mutableListOf<Task>(
-        Task("Feed the cat", "It likes to eat mice!", TaskPriority.HIGH),
-        Task("Feed the dog", "It likes to eat mice!", TaskPriority.HIGH),
-        Task("Feed the hamster", "It likes to eat mice!", TaskPriority.HIGH),
-    )
+    private val taskList = MutableStateFlow<MutableList<Task>>(INITIAL_TASK_LIST)
 
     private val launcher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 val newTask = result.data?.getSerializableExtra(CREATE_TASK_RESULT) as Task
-                taskList.add(newTask)
+                taskList.value = taskList.value.toMutableList().apply { add(newTask) }
                 Timber.d("result: $newTask")
             }
         }
@@ -87,8 +90,11 @@ class TaskListActivity : ComponentActivity() {
 
     @Composable
     private fun ScreenContent(modifier: Modifier, createTaskButtonClick: () -> Unit) {
+
+        val taskList = taskList.collectAsState()
+
         Box(modifier) {
-            if (taskList.isEmpty()) {
+            if (taskList.value.isEmpty()) {
                 ShowEmptyList {
                     createTaskButtonClick()
                 }
@@ -117,9 +123,11 @@ class TaskListActivity : ComponentActivity() {
     private fun ShowList() {
         Timber.d("ShowList()")
 
+        val tasks = taskList.collectAsState().value
+
         LazyColumn {
-            items(taskList.size) { index ->
-                ShowTaskElement(taskList[index])
+            items(tasks.size) { index ->
+                ShowTaskElement(taskList.collectAsState().value[index])
             }
         }
     }
