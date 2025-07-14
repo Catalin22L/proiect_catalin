@@ -30,13 +30,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.globant.pretatit.DI
 import com.globant.pretatit.R
 import com.globant.pretatit.components.SimpleDropdown
+import com.globant.pretatit.domain.CreateTaskUseCase.Params
+import com.globant.pretatit.domain.CreateTaskUseCaseImpl
 import com.globant.pretatit.presentation.theme.PretatitTheme
 
 class CreateTaskActivity : ComponentActivity() {
 
     private var task: Task = Task("", "", TaskPriority.NONE)
+    private val createTaskUseCase = CreateTaskUseCaseImpl(DI.taskRepository)
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,6 +67,9 @@ class CreateTaskActivity : ComponentActivity() {
     }
 
     private fun navigateWithResult() {
+
+        createTaskUseCase.invoke(Params(task))
+
         val result = Intent()
         result.putExtra(CREATE_TASK_RESULT, task)
         setResult(RESULT_OK, result)

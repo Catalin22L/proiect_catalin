@@ -42,6 +42,8 @@ android {
 dependencies {
 
     implementation(project(":mylibrary"))
+    implementation (libs.gson)
+
     implementation(libs.timber)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

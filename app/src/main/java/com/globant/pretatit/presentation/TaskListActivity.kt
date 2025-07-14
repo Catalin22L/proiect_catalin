@@ -31,6 +31,7 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.globant.pretatit.DI
 import com.globant.pretatit.R
 import com.globant.pretatit.presentation.theme.PretatitTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -130,6 +131,8 @@ class TaskListActivity : ComponentActivity() {
                 ShowTaskElement(taskList.collectAsState().value[index])
             }
         }
+
+        Timber.d("SH taks: %s", DI.taskRepository.getAllTasks().toString())
     }
 
     @Composable

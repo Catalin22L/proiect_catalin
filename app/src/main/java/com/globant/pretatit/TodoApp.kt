@@ -9,5 +9,7 @@ class TodoApp : Application() {
         super.onCreate()
 
         Timber.plant(Timber.DebugTree())
+
+        DI.init(this)
     }
 }
