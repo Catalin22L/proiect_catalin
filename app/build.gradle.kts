@@ -43,6 +43,7 @@ dependencies {
 
     implementation(project(":mylibrary"))
     implementation (libs.gson)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     implementation(libs.timber)
     implementation(libs.androidx.core.ktx)

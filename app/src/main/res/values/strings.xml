@@ -15,6 +15,7 @@
     <string name="create_task_task_enter_description">Enter description here</string>
 
     <string name="create_task_task_priority">Priority</string>
+    <string name="create_task_task_order">Order by priority</string>
 
 
 </resources>

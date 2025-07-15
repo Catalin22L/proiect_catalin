@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,30 +30,29 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import com.globant.pretatit.DI
 import com.globant.pretatit.R
+import com.globant.pretatit.domain.GetAllTasksUseCaseImpl
 import com.globant.pretatit.presentation.theme.PretatitTheme
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.globant.pretatit.presentation.viewmodel.TaskListViewModel
+import com.globant.pretatit.presentation.viewmodel.TaskViewModelFactory
 import timber.log.Timber
 
 const val CREATE_TASK_RESULT = "create.task.result"
 
-private val INITIAL_TASK_LIST = mutableListOf<Task>(
-    Task("Feed the cat", "It likes to eat mice!", TaskPriority.HIGH),
-    Task("Feed the dog", "It likes to eat mice!", TaskPriority.HIGH),
-    Task("Feed the hamster", "It likes to eat mice!", TaskPriority.HIGH),
-)
 
 class TaskListActivity : ComponentActivity() {
 
-    private val taskList = MutableStateFlow<MutableList<Task>>(INITIAL_TASK_LIST)
+    private lateinit var viewModel: TaskListViewModel
 
     private val launcher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 val newTask = result.data?.getSerializableExtra(CREATE_TASK_RESULT) as Task
-                taskList.value = taskList.value.toMutableList().apply { add(newTask) }
                 Timber.d("result: $newTask")
+
+                viewModel.addTask(newTask)
             }
         }
 
@@ -62,6 +60,8 @@ class TaskListActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        initVIewModel()
 
         setContent {
             PretatitTheme {
@@ -75,11 +75,18 @@ class TaskListActivity : ComponentActivity() {
 
                     ScreenContent(
                         Modifier.padding(paddingValue),
-                        createTaskButtonClick = { startCreateActivityForResult() }
+                        createTaskButtonClick = { startCreateActivityForResult() },
+                        orderByButtonClick = { viewModel.sortByPriority() }
                     )
                 }
             }
         }
+    }
+
+    private fun initVIewModel() {
+        val viewModelFactory = TaskViewModelFactory(GetAllTasksUseCaseImpl(DI.taskRepository))
+        viewModel = ViewModelProvider(this, viewModelFactory)[TaskListViewModel::class.java]
+        viewModel.init()
     }
 
     private fun startCreateActivityForResult() {
@@ -90,16 +97,20 @@ class TaskListActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun ScreenContent(modifier: Modifier, createTaskButtonClick: () -> Unit) {
+    private fun ScreenContent(
+        modifier: Modifier, createTaskButtonClick: () -> Unit,
+        orderByButtonClick: () -> Unit
+    ) {
 
-        val taskList = taskList.collectAsState()
+        val taskList = viewModel.taskList.collectAsState()
 
-        Box(modifier) {
+        Column(modifier) {
             if (taskList.value.isEmpty()) {
                 ShowEmptyList {
                     createTaskButtonClick()
                 }
             } else {
+                ShowOrderingButtons(orderByButtonClick)
                 ShowList()
             }
         }
@@ -121,14 +132,31 @@ class TaskListActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun ShowOrderingButtons(orderClickListener: () -> Unit) {
+        Timber.d("ShowOrderingButtons()")
+
+        Button(
+            onClick = orderClickListener,
+            modifier = Modifier
+                .padding(start = 25.dp, top = 25.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.create_task_task_order),
+                fontSize = 20.sp
+            )
+        }
+    }
+
+
+    @Composable
     private fun ShowList() {
         Timber.d("ShowList()")
 
-        val tasks = taskList.collectAsState().value
+        val tasks = viewModel.taskList.collectAsState().value
 
         LazyColumn {
             items(tasks.size) { index ->
-                ShowTaskElement(taskList.collectAsState().value[index])
+                ShowTaskElement(viewModel.taskList.collectAsState().value[index])
             }
         }
 
@@ -166,7 +194,6 @@ class TaskListActivity : ComponentActivity() {
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
