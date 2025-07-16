@@ -2,71 +2,131 @@ package com.globant.pretatit.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.globant.pretatit.domain.GetAllTasksUseCase
+import androidx.lifecycle.viewModelScope
+import com.globant.pretatit.domain.repos.TaskRepository
 import com.globant.pretatit.presentation.Task
-import com.globant.pretatit.presentation.TaskPriority
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 
-private val INITIAL_TASK_LIST = mutableListOf<Task>(
-    Task("Feed the cat", "It likes to eat mice!", TaskPriority.HIGH),
-    Task("Feed the dog", "It likes to eat mice!", TaskPriority.LOW),
-    Task("Feed the hamster", "It likes to eat mice!", TaskPriority.URGENT),
-)
-
 class TaskListViewModel(
-    private val getAllTasksUseCase: GetAllTasksUseCase,
+    private val taskRepository: TaskRepository
 ) : ViewModel() {
 
-    private val coroutineScope = CoroutineScope(Dispatchers.Main)
+    private val _allTasks = MutableStateFlow<List<Task>>(emptyList())
+    // Stare pentru a gestiona sortarea
+    private val _sortState = MutableStateFlow(SortState())
+    private val _categoryFilter = MutableStateFlow("ALL")
 
-    private val _taskList = MutableStateFlow<MutableList<Task>>(INITIAL_TASK_LIST)
-    val taskList: StateFlow<List<Task>> = _taskList
+    val taskList = combine(_allTasks, _sortState, _categoryFilter) { tasks, sortState, category ->
+        val filteredTasks = if (category == "ALL") {
+            tasks
+        } else {
+            tasks.filter { it.category.name == category }
+        }
+
+        val sortedByDone = filteredTasks.sortedBy { it.isDone }
+
+        // Logica de sortare
+        when (sortState.criteria) {
+            SortCriteria.PRIORITY -> {
+                if (sortState.order == SortOrder.ASC) {
+                    sortedByDone.sortedBy { it.taskPriority.ordinal }
+                } else {
+                    sortedByDone.sortedByDescending { it.taskPriority.ordinal }
+                }
+            }
+            SortCriteria.DATE -> {
+                if (sortState.order == SortOrder.ASC) {
+                    // Sarcinile fara data sunt puse la sfarsit
+                    sortedByDone.sortedWith(compareBy(nullsLast()) { it.dueDate })
+                } else {
+                    sortedByDone.sortedWith(compareByDescending(nullsLast()) { it.dueDate })
+                }
+            }
+        }
+    }
+
+    private val _showDeleteConfirmation = MutableStateFlow<Task?>(null)
+    val showDeleteConfirmation = _showDeleteConfirmation.asStateFlow()
 
     fun init() {
-        coroutineScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                getAllTasksUseCase.invoke(Unit)
-            }
-
-            result.handleResult(
-                {
-                    _taskList.value = it.toMutableList()
-                },
-                {
-                    Timber.w("Something went wrong when reading from the disk...")
-                }
+        viewModelScope.launch {
+            taskRepository.getAllTasks().handleResult(
+                successFlow = { _allTasks.value = it },
+                errorFlow = { Timber.w("Error fetching tasks") }
             )
         }
     }
 
-    fun sortByPriority() {
-        _taskList.value = _taskList.value.sortedBy { it.taskPriority.ordinal }.toMutableList()
-    }
-
     fun addTask(task: Task) {
-        _taskList.value =
-            _taskList.value.apply { add(task) }
+        viewModelScope.launch {
+            taskRepository.saveTask(task)
+            init()
+        }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        coroutineScope.cancel()
+    // Comuta intre sortare ascendenta si descendenta
+    fun toggleSortOrder() {
+        _sortState.value = _sortState.value.copy(
+            order = if (_sortState.value.order == SortOrder.ASC) SortOrder.DESC else SortOrder.ASC
+        )
+    }
+
+    // Comuta intre sortarea dupa prioritate si data
+    fun toggleSortCriteria() {
+        _sortState.value = _sortState.value.copy(
+            criteria = if (_sortState.value.criteria == SortCriteria.PRIORITY) SortCriteria.DATE else SortCriteria.PRIORITY
+        )
+    }
+
+    fun filterByCategory(category: String) {
+        _categoryFilter.value = category
+    }
+
+    fun onTaskCheckedChange(task: Task, isChecked: Boolean) {
+        viewModelScope.launch {
+            val updatedTask = task.copy(isDone = isChecked)
+            taskRepository.updateTask(updatedTask)
+            init()
+        }
+    }
+
+    fun onDeleteTaskClicked(task: Task) {
+        _showDeleteConfirmation.value = task
+    }
+
+    fun confirmTaskDeletion() {
+        _showDeleteConfirmation.value?.let { task ->
+            viewModelScope.launch {
+                taskRepository.deleteTask(task.id)
+                _showDeleteConfirmation.value = null
+                init()
+            }
+        }
+    }
+
+    fun cancelTaskDeletion() {
+        _showDeleteConfirmation.value = null
     }
 }
 
-class TaskViewModelFactory(private val getAllTasksUseCase: GetAllTasksUseCase) :
+// Stari si criterii pentru sortare
+enum class SortOrder { ASC, DESC }
+enum class SortCriteria { PRIORITY, DATE }
+data class SortState(
+    val criteria: SortCriteria = SortCriteria.PRIORITY,
+    val order: SortOrder = SortOrder.ASC
+)
+
+
+class TaskViewModelFactory(private val taskRepository: TaskRepository) :
     ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TaskListViewModel::class.java)) {
-            return TaskListViewModel(getAllTasksUseCase) as T
+            return TaskListViewModel(taskRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

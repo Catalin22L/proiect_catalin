@@ -1,49 +1,84 @@
 package com.globant.pretatit.presentation.viewmodel
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.globant.pretatit.domain.CreateTaskUseCase
+import com.globant.pretatit.core.Result
+import com.globant.pretatit.domain.repos.TaskRepository
 import com.globant.pretatit.presentation.Task
+import com.globant.pretatit.presentation.TaskCategory
 import com.globant.pretatit.presentation.TaskPriority
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class CreateTaskViewModel(
-    private val createTaskUseCase: CreateTaskUseCase
-) : ViewModel(
-) {
-    private var task: Task = Task("", "", TaskPriority.NONE)
+    private val taskRepository: TaskRepository
+) : ViewModel() {
 
-    fun updateTitle(title: String) {
-        task = task.copy(title = title)
+    var isEditMode by mutableStateOf(false)
+        private set
+
+    private var taskId: String? = null
+    private var isDone: Boolean = false
+
+    var title by mutableStateOf("")
+    var description by mutableStateOf("")
+    var priority by mutableStateOf(TaskPriority.NONE)
+    var category by mutableStateOf(TaskCategory.OTHER)
+    var dueDate by mutableStateOf<Long?>(null)
+
+    fun loadTask(task: Task?) {
+        if (task != null) {
+            isEditMode = true
+            taskId = task.id
+            title = task.title
+            description = task.description
+            priority = task.taskPriority
+            category = task.category
+            dueDate = task.dueDate
+            isDone = task.isDone
+        }
     }
 
-    fun updateDescription(description: String) {
-        task = task.copy(description = description)
-    }
-
-    fun updatePriority(priority: TaskPriority) {
-        task = task.copy(taskPriority = priority)
-    }
-
-    fun createTask(): Task {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                createTaskUseCase(CreateTaskUseCase.Params(task))
-            }
+    fun saveOrUpdateTask(onResult: (Boolean) -> Unit) {
+        if (title.isBlank() || description.isBlank()) {
+            onResult(false)
+            return
         }
 
-        return task
+        viewModelScope.launch {
+            val taskToSave = Task(
+                id = taskId ?: java.util.UUID.randomUUID().toString(),
+                title = title,
+                description = description,
+                taskPriority = priority,
+                category = category,
+                dueDate = dueDate,
+                isDone = isDone
+            )
+
+            val result = if (isEditMode) {
+                taskRepository.updateTask(taskToSave)
+            } else {
+                taskRepository.saveTask(taskToSave)
+            }
+
+            when (result) {
+                is Result.Success -> onResult(true)
+                is Result.Error -> onResult(false)
+            }
+        }
     }
 }
 
-class CreateTaskModelFactory(private val createTaskUseCase: CreateTaskUseCase) :
+class CreateTaskModelFactory(private val taskRepository: TaskRepository) :
     ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CreateTaskViewModel::class.java)) {
-            return CreateTaskViewModel(createTaskUseCase) as T
+            @Suppress("UNCHECKED_CAST")
+            return CreateTaskViewModel(taskRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

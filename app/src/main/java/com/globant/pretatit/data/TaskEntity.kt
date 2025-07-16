@@ -3,7 +3,7 @@ package com.globant.pretatit.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
-import com.globant.pretatit.data.datasource.TaskPriorityConverter
+import com.globant.pretatit.data.datasource.local.db.TaskPriorityConverter
 import com.globant.pretatit.presentation.TaskPriority
 
 @Entity(tableName = "tasks")

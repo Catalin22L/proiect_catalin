@@ -1,4 +1,4 @@
-package com.globant.pretatit.data.datasource
+package com.globant.pretatit.data.datasource.local
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -16,29 +16,25 @@ class SharedPreferencesManager(
     private val preferences: SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
-    fun getString(key: String): String {
+    private fun getString(key: String): String {
         return preferences.getString(key, "") ?: ""
     }
 
-    fun putString(key: String, value: String) {
+    private fun putString(key: String, value: String) {
         preferences.edit { putString(key, value) }
     }
 
-    fun saveTask(key: String, task: Task) {
-        val list = getTasks(key).toMutableList()
-        list.add(task)
-
-        val json = gson.toJson(list)
+    // Am modificat saveTask pentru a salva o lista intreaga
+    fun saveTasks(key: String, tasks: List<Task>) {
+        val json = gson.toJson(tasks)
         putString(key, json)
     }
 
     fun getTasks(key: String): List<Task> {
         val serialized = getString(key)
-
         if (serialized.isEmpty()) {
             return emptyList()
         }
-
         val type = object : TypeToken<List<Task>>() {}.type
         return gson.fromJson(serialized, type)
     }

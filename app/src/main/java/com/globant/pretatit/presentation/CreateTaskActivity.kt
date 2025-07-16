@@ -1,186 +1,194 @@
 package com.globant.pretatit.presentation
 
-import android.content.Intent
+import android.app.DatePickerDialog
 import android.os.Bundle
+import android.widget.DatePicker
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Done
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import com.globant.pretatit.DI
 import com.globant.pretatit.R
 import com.globant.pretatit.components.SimpleDropdown
-import com.globant.pretatit.domain.CreateTaskUseCaseImpl
 import com.globant.pretatit.presentation.theme.PretatitTheme
 import com.globant.pretatit.presentation.viewmodel.CreateTaskModelFactory
 import com.globant.pretatit.presentation.viewmodel.CreateTaskViewModel
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+
+const val EDIT_TASK_EXTRA = "edit_task_extra"
 
 class CreateTaskActivity : ComponentActivity() {
 
     private lateinit var createTaskViewModel: CreateTaskViewModel
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         initViewModel()
+
+        val taskToEdit = intent.getSerializableExtra(EDIT_TASK_EXTRA) as? Task
+        createTaskViewModel.loadTask(taskToEdit)
 
         setContent {
             PretatitTheme {
                 Scaffold(
                     topBar = {
-                        CreateListTopAppBar(navAction = {
-                            navigateBack()
-                        }, actionAction = {
-                            navigateWithResult()
-                        })
-                    }) { padding ->
-                    ScreenContent(Modifier.padding(padding))
+                        CreateListTopAppBar(
+                            isEditMode = createTaskViewModel.isEditMode,
+                            navAction = { finish() },
+                            actionAction = {
+                                createTaskViewModel.saveOrUpdateTask { success ->
+                                    if (success) {
+                                        setResult(RESULT_OK)
+                                        finish()
+                                    } else {
+                                        Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        )
+                    }
+                ) { padding ->
+                    ScreenContent(Modifier.padding(padding), createTaskViewModel)
                 }
             }
         }
     }
 
-    private fun navigateBack() {
-        finish()
-    }
-
-    private fun navigateWithResult() {
-
-        val task = createTaskViewModel.createTask()
-
-        val result = Intent()
-        result.putExtra(CREATE_TASK_RESULT, task)
-        setResult(RESULT_OK, result)
-
-        finish()
-    }
-
     private fun initViewModel() {
-        val viewModelFactory = CreateTaskModelFactory(CreateTaskUseCaseImpl(DI.taskRepository))
-        createTaskViewModel =
-            ViewModelProvider(this, viewModelFactory)[CreateTaskViewModel::class.java]
+        val viewModelFactory = CreateTaskModelFactory(DI.taskRepository)
+        createTaskViewModel = ViewModelProvider(this, viewModelFactory)[CreateTaskViewModel::class.java]
     }
+}
 
-    @Composable
-    private fun ScreenContent(modifier: Modifier) {
-        Column(modifier) {
-            TextAndEditText(
-                stringResource(R.string.create_task_task_title),
-                stringResource(R.string.create_task_enter_task)
-            ) { newValue ->
-                createTaskViewModel.updateTitle(newValue)
-            }
-
-            Spacer(Modifier.size(20.dp))
-
-            TextAndEditText(
-                stringResource(R.string.create_task_task_description),
-                stringResource(R.string.create_task_task_enter_description)
-            )
-            { newValue ->
-                createTaskViewModel.updateDescription(newValue)
-            }
-
-            Spacer(Modifier.size(20.dp))
-
-            ShowTaskPriority()
-        }
-    }
-
-    @Composable
-    private fun TextAndEditText(
-        textString: String,
-        editTextLabel: String,
-        onValueChanged: (String) -> Unit
+@Composable
+private fun ScreenContent(modifier: Modifier, viewModel: CreateTaskViewModel) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Spacer(Modifier.size(20.dp))
-            Text(text = textString, fontSize = 20.sp)
-            Spacer(Modifier.size(20.dp))
-            EditText(label = editTextLabel, { newValue -> onValueChanged(newValue) })
-            Spacer(Modifier.size(20.dp))
-        }
-    }
-
-    @Composable
-    private fun ShowTaskPriority() {
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Spacer(Modifier.size(20.dp))
-            Text(stringResource(R.string.create_task_task_priority), fontSize = 20.sp)
-            Spacer(Modifier.size(20.dp))
-            SimpleDropdown(TaskPriority.toListOfStrings()) { newValue ->
-                val newTaskPriority = TaskPriority.getValueByName(newValue)
-                createTaskViewModel.updatePriority(newTaskPriority)
-            }
-        }
-    }
-
-    @Composable
-    private fun EditText(label: String, onValueChanged: (String) -> Unit) {
-        var text: String by remember { mutableStateOf("") }
-
         OutlinedTextField(
-            singleLine = true,
-            value = text,
-            onValueChange = {
-                text = it
-                onValueChanged(text)
-            },
-            label = { Text(label, fontSize = 20.sp) }
+            value = viewModel.title,
+            onValueChange = { viewModel.title = it },
+            label = { Text(stringResource(R.string.create_task_task_title)) },
+            modifier = Modifier.fillMaxWidth()
         )
+        Spacer(Modifier.height(16.dp))
+        OutlinedTextField(
+            value = viewModel.description,
+            onValueChange = { viewModel.description = it },
+            label = { Text(stringResource(R.string.create_task_task_description)) },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 3
+        )
+        Spacer(Modifier.height(24.dp))
+        LabeledDropdown(
+            label = "Priority",
+            options = TaskPriority.toListOfStrings(),
+            initialValue = viewModel.priority.name,
+            onValueChanged = { viewModel.priority = TaskPriority.getValueByName(it) }
+        )
+        Spacer(Modifier.height(16.dp))
+        LabeledDropdown(
+            label = "Category",
+            options = TaskCategory.toListOfStrings(),
+            initialValue = viewModel.category.name,
+            onValueChanged = { viewModel.category = TaskCategory.getValueByName(it) }
+        )
+        Spacer(Modifier.height(24.dp))
+        DatePickerView(
+            selectedDate = viewModel.dueDate,
+            onDateSelected = { viewModel.dueDate = it }
+        )
+    }
+}
+
+@Composable
+private fun LabeledDropdown(label: String, options: List<String>, initialValue: String, onValueChanged: (String) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        SimpleDropdown(options = options, initialValue = initialValue, onValueChanged = onValueChanged)
+    }
+}
+
+@Composable
+fun DatePickerView(selectedDate: Long?, onDateSelected: (Long) -> Unit) {
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance()
+
+    selectedDate?.let { calendar.timeInMillis = it }
+
+    val datePickerDialog = DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            val newDate = Calendar.getInstance().apply { set(year, month, dayOfMonth) }
+            onDateSelected(newDate.timeInMillis)
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text("Due Date:", style = MaterialTheme.typography.bodyLarge)
+        Button(onClick = { datePickerDialog.show() }) {
+            Text(
+                selectedDate?.let {
+                    SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(it)
+                } ?: "Select Date"
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CreateListTopAppBar(navAction: () -> Unit, actionAction: () -> Unit) {
-    TopAppBar(title = {
-        Text(stringResource(R.string.create_task_title))
-    }, navigationIcon = {
-        IconButton(onClick = navAction) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.task_list_create_task_back_description)
-            )
-        }
-    }, actions = {
-        IconButton(onClick = actionAction) {
-            Icon(
-                imageVector = Icons.Default.Done,
-                contentDescription = stringResource(R.string.task_list_save_task_description)
-            )
-        }
-    })
+private fun CreateListTopAppBar(isEditMode: Boolean, navAction: () -> Unit, actionAction: () -> Unit) {
+    val title = if (isEditMode) "Edit Task" else stringResource(R.string.create_task_title)
+    TopAppBar(
+        title = { Text(title) },
+        navigationIcon = {
+            IconButton(onClick = navAction) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.task_list_create_task_back_description)
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = actionAction) {
+                Icon(
+                    imageVector = Icons.Default.Done,
+                    contentDescription = stringResource(R.string.task_list_save_task_description)
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            titleContentColor = MaterialTheme.colorScheme.onPrimary,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    )
 }
