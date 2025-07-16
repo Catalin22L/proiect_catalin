@@ -6,7 +6,7 @@ import com.globant.pretatit.presentation.Task
 
 interface TaskRepository {
 
-    fun saveTask(task: Task): Result<Unit, Failure>
+    suspend fun saveTask(task: Task): Result<Unit, Failure>
 
-    fun getAllTasks(): Result<List<Task>, Failure>
+    suspend fun getAllTasks(): Result<List<Task>, Failure>
 }

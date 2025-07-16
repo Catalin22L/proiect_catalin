@@ -11,7 +11,7 @@ interface GetAllTasksUseCase : UseCase<Unit, List<Task>>
 class GetAllTasksUseCaseImpl(
     private val taskRepository: TaskRepository
 ) : GetAllTasksUseCase {
-    override fun invoke(params: Unit): Result<List<Task>, Failure> {
+    override suspend fun invoke(params: Unit): Result<List<Task>, Failure> {
         return taskRepository.getAllTasks()
     }
 }

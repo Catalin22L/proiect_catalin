@@ -30,21 +30,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import com.globant.pretatit.DI
 import com.globant.pretatit.R
 import com.globant.pretatit.components.SimpleDropdown
-import com.globant.pretatit.domain.CreateTaskUseCase.Params
 import com.globant.pretatit.domain.CreateTaskUseCaseImpl
 import com.globant.pretatit.presentation.theme.PretatitTheme
+import com.globant.pretatit.presentation.viewmodel.CreateTaskModelFactory
+import com.globant.pretatit.presentation.viewmodel.CreateTaskViewModel
 
 class CreateTaskActivity : ComponentActivity() {
 
-    private var task: Task = Task("", "", TaskPriority.NONE)
-    private val createTaskUseCase = CreateTaskUseCaseImpl(DI.taskRepository)
+    private lateinit var createTaskViewModel: CreateTaskViewModel
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        initViewModel()
 
         setContent {
             PretatitTheme {
@@ -68,13 +71,19 @@ class CreateTaskActivity : ComponentActivity() {
 
     private fun navigateWithResult() {
 
-        createTaskUseCase.invoke(Params(task))
+        val task = createTaskViewModel.createTask()
 
         val result = Intent()
         result.putExtra(CREATE_TASK_RESULT, task)
         setResult(RESULT_OK, result)
 
         finish()
+    }
+
+    private fun initViewModel() {
+        val viewModelFactory = CreateTaskModelFactory(CreateTaskUseCaseImpl(DI.taskRepository))
+        createTaskViewModel =
+            ViewModelProvider(this, viewModelFactory)[CreateTaskViewModel::class.java]
     }
 
     @Composable
@@ -84,7 +93,7 @@ class CreateTaskActivity : ComponentActivity() {
                 stringResource(R.string.create_task_task_title),
                 stringResource(R.string.create_task_enter_task)
             ) { newValue ->
-                task = task.copy(title = newValue)
+                createTaskViewModel.updateTitle(newValue)
             }
 
             Spacer(Modifier.size(20.dp))
@@ -94,7 +103,7 @@ class CreateTaskActivity : ComponentActivity() {
                 stringResource(R.string.create_task_task_enter_description)
             )
             { newValue ->
-                task = task.copy(description = newValue)
+                createTaskViewModel.updateDescription(newValue)
             }
 
             Spacer(Modifier.size(20.dp))
@@ -133,7 +142,7 @@ class CreateTaskActivity : ComponentActivity() {
             Spacer(Modifier.size(20.dp))
             SimpleDropdown(TaskPriority.toListOfStrings()) { newValue ->
                 val newTaskPriority = TaskPriority.getValueByName(newValue)
-                task = task.copy(taskPriority = newTaskPriority)
+                createTaskViewModel.updatePriority(newTaskPriority)
             }
         }
     }

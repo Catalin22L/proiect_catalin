@@ -52,7 +52,7 @@ class TaskListActivity : ComponentActivity() {
                 val newTask = result.data?.getSerializableExtra(CREATE_TASK_RESULT) as Task
                 Timber.d("result: $newTask")
 
-                viewModel.addTask(newTask)
+              //  viewModel.addTask(newTask)
             }
         }
 
@@ -83,10 +83,14 @@ class TaskListActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        viewModel.init()
+    }
+
     private fun initVIewModel() {
         val viewModelFactory = TaskViewModelFactory(GetAllTasksUseCaseImpl(DI.taskRepository))
         viewModel = ViewModelProvider(this, viewModelFactory)[TaskListViewModel::class.java]
-        viewModel.init()
     }
 
     private fun startCreateActivityForResult() {
@@ -159,8 +163,6 @@ class TaskListActivity : ComponentActivity() {
                 ShowTaskElement(viewModel.taskList.collectAsState().value[index])
             }
         }
-
-        Timber.d("SH taks: %s", DI.taskRepository.getAllTasks().toString())
     }
 
     @Composable

@@ -16,7 +16,7 @@ interface CreateTaskUseCase : UseCase<Params, Unit> {
 class CreateTaskUseCaseImpl(
     private val taskRepository: TaskRepository
 ) : CreateTaskUseCase {
-    override fun invoke(params: CreateTaskUseCase.Params): Result<Unit, Failure> {
+    override suspend fun invoke(params: Params): Result<Unit, Failure> {
         return taskRepository.saveTask(params.task)
     }
 }

@@ -5,8 +5,14 @@ import androidx.lifecycle.ViewModelProvider
 import com.globant.pretatit.domain.GetAllTasksUseCase
 import com.globant.pretatit.presentation.Task
 import com.globant.pretatit.presentation.TaskPriority
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 private val INITIAL_TASK_LIST = mutableListOf<Task>(
@@ -16,22 +22,29 @@ private val INITIAL_TASK_LIST = mutableListOf<Task>(
 )
 
 class TaskListViewModel(
-    private val tasksUseCase: GetAllTasksUseCase
+    private val getAllTasksUseCase: GetAllTasksUseCase,
 ) : ViewModel() {
+
+    private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     private val _taskList = MutableStateFlow<MutableList<Task>>(INITIAL_TASK_LIST)
     val taskList: StateFlow<List<Task>> = _taskList
 
     fun init() {
-        tasksUseCase.invoke(Unit)
-            .handleResult(
+        coroutineScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                getAllTasksUseCase.invoke(Unit)
+            }
+
+            result.handleResult(
                 {
                     _taskList.value = it.toMutableList()
                 },
                 {
-                    Timber.w("SOmething went wrong when reading the tasks from SH")
+                    Timber.w("Something went wrong when reading from the disk...")
                 }
             )
+        }
     }
 
     fun sortByPriority() {
@@ -41,6 +54,11 @@ class TaskListViewModel(
     fun addTask(task: Task) {
         _taskList.value =
             _taskList.value.apply { add(task) }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        coroutineScope.cancel()
     }
 }
 
