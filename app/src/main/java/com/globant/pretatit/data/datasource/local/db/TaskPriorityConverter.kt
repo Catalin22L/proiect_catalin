@@ -1,4 +1,4 @@
-package com.globant.pretatit.data.datasource
+package com.globant.pretatit.data.datasource.local.db
 
 import androidx.room.TypeConverter
 import com.globant.pretatit.presentation.TaskPriority

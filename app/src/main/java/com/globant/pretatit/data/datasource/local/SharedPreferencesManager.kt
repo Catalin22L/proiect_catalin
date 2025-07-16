@@ -1,4 +1,4 @@
-package com.globant.pretatit.data.datasource
+package com.globant.pretatit.data.datasource.local
 
 import android.content.Context
 import android.content.SharedPreferences

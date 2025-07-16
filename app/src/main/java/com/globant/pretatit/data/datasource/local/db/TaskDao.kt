@@ -1,4 +1,4 @@
-package com.globant.pretatit.data.datasource
+package com.globant.pretatit.data.datasource.local.db
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -9,7 +9,7 @@ import com.globant.pretatit.data.TaskEntity
 @Dao
 interface TaskDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
     suspend fun insertTask(task: TaskEntity)
 
     @Query("SELECT * FROM tasks")
